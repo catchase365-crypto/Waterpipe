@@ -2,112 +2,153 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>矩阵接水管核心关卡</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>矩阵接水管-OLED版</title>
     <style>
         :root {
-            --bg-color: #121214;
-            --grid-bg: #1e1e24;
-            --cell-bg: #2a2a35;
-            --pipe-empty: #505061;
-            --pipe-water: #00d2ff;
-            --text-color: #ffffff;
+            --bg-color: #000000;       /* OLED 纯黑 */
+            --grid-bg: #09090b;        /* 深色网格底框 */
+            --cell-bg: #141418;        /* 格子背景 */
+            --pipe-empty: #223828;     /* 空管道暗绿 */
+            --pipe-water: #00ff66;     /* 荧光绿流水 */
+            --text-color: #e0e0e0;
         }
 
         body {
             background-color: var(--bg-color);
             color: var(--text-color);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
             margin: 0;
-            overflow-x: hidden;
+            padding: 10px;
+            box-sizing: border-box;
+            overflow: hidden;
+            /* 禁用手机双击缩放和长按菜单 */
+            touch-action: manipulation;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
         }
 
         h1 {
-            margin-bottom: 5px;
+            font-size: 22px;
+            margin: 5px 0;
             font-weight: 600;
             letter-spacing: 2px;
-            text-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
+            color: var(--pipe-water);
+            text-shadow: 0 0 10px rgba(0, 255, 102, 0.4);
         }
 
-        .tips {
-            color: #aaa;
+        /* 游戏模式选择器 */
+        .mode-selector {
+            display: flex;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 3px;
+            margin-bottom: 12px;
+            width: 90vw;
+            max-width: 400px;
+        }
+        .mode-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #888;
+            padding: 8px 5px;
+            font-size: 13px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .mode-btn.active {
+            background: var(--pipe-water);
+            color: #000;
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(0, 255, 102, 0.3);
+        }
+
+        /* 顶部状态栏 */
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            width: 90vw;
+            max-width: 400px;
+            margin-bottom: 12px;
             font-size: 14px;
-            margin-bottom: 20px;
+            background: #111;
+            padding: 8px 14px;
+            border-radius: 6px;
+            border: 1px solid #222;
+            box-sizing: border-box;
+        }
+        .status-val {
+            color: var(--pipe-water);
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(0, 255, 102, 0.5);
         }
 
-        /* 游戏主容器，包含入水口和出水口提示 */
+        /* 游戏核心区域包装器（彻底解决手机侧边越界） */
         .game-wrapper {
-            position: relative;
-            padding: 20px;
+            width: 92vw;
+            max-width: 420px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
 
-        /* 起点和终点标签 */
-        .io-indicator {
-            position: absolute;
-            background: rgba(0, 210, 255, 0.1);
-            border: 1px solid var(--pipe-water);
-            padding: 4px 8px;
-            border-radius: 4px;
+        /* 进出水口提示栏 */
+        .io-bar {
+            display: flex;
+            justify-content: space-between;
             font-size: 12px;
             color: var(--pipe-water);
-            box-shadow: 0 0 8px rgba(0, 210, 255, 0.2);
+            font-weight: bold;
+            padding: 0 4px;
         }
-        #start-label { top: -40px; left: 0; }
-        #end-label { bottom: -40px; right: 0; }
+        .io-blink {
+            animation: pulse 1.5s infinite alternate;
+        }
+        @keyframes pulse {
+            from { opacity: 0.6; text-shadow: 0 0 2px var(--pipe-water); }
+            to { opacity: 1; text-shadow: 0 0 8px var(--pipe-water); }
+        }
 
-        /* 10x10 网格容器 */
+        /* 10x10 网格：宽高完全基于容器等比缩放 */
         .grid-container {
             display: grid;
-            grid-template-columns: repeat(10, 8vw);
-            grid-template-rows: repeat(10, 8vw);
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(10, 1fr);
             gap: 2px;
             background-color: var(--grid-bg);
-            padding: 5px;
+            padding: 4px;
             border-radius: 8px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-            max-width: 95vw;
+            border: 1px solid #222;
+            box-shadow: 0 0 20px rgba(0,255,102,0.05);
+            aspect-ratio: 1 / 1; /* 锁定正方形 */
+            width: 100%;
+            box-sizing: border-box;
         }
 
-        /* 单个格子样式 */
-        .cell {
-            width: 8vw;
-            height: 8vw;
-            background-color: var(--cell-bg);
-            border-radius: 4px;
-            cursor: pointer;
-            position: relative;
-            overflow: hidden;
-            transition: background-color 0.2s;
-        }
-
-        /* 单个格子样式 */
+        /* 单个格子 */
         .cell {
             background-color: var(--cell-bg);
-            border-radius: 4px;
-            cursor: pointer;
+            border-radius: 3px;
             position: relative;
             overflow: hidden;
-            transition: background-color 0.2s;
         }
 
-        .cell:hover {
-            background-color: #353545;
-        }
-
-        /* 内部旋转层 */
         .pipe-inner {
             width: 100%;
             height: 100%;
             position: relative;
-            transition: transform 0.25s ease-out;
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* 阀门/水管核心：正方形模块 */
+        /* 纯百分比自适应的阀门核心与分支 */
         .pipe-core {
             position: absolute;
             top: 32%;
@@ -115,66 +156,57 @@
             width: 36%;
             height: 36%;
             background-color: var(--pipe-empty);
-            border-radius: 3px;
+            border-radius: 2px;
             z-index: 2;
-            transition: background-color 0.3s, box-shadow 0.3s;
+            transition: background-color 0.25s, box-shadow 0.25s;
         }
 
-        /* 水管分支（上下左右） */
         .pipe-branch {
             position: absolute;
             background-color: var(--pipe-empty);
             z-index: 1;
-            transition: background-color 0.3s, box-shadow 0.3s;
+            transition: background-color 0.25s, box-shadow 0.25s;
         }
+        /* 四方向分支通过百分比完美对齐中心 */
+        .branch-0 { top: 0; left: 42%; width: 16%; height: 36%; }
+        .branch-1 { top: 42%; right: 0; width: 36%; height: 16%; }
+        .branch-2 { bottom: 0; left: 42%; width: 16%; height: 36%; }
+        .branch-3 { top: 42%; left: 0; width: 36%; height: 16%; }
 
-        .branch-0 { /* Top */
-            top: 0; left: 42%; width: 16%; height: 42%;
-        }
-        .branch-1 { /* Right */
-            top: 42%; right: 0; width: 42%; height: 16%;
-        }
-        .branch-2 { /* Bottom */
-            bottom: 0; left: 42%; width: 16%; height: 42%;
-        }
-        .branch-3 { /* Left */
-            top: 42%; left: 0; width: 42%; height: 16%;
-        }
-
-        /* 充水状态下的样式 */
+        /* 绿色流水注入状态 */
         .filled .pipe-core {
             background-color: var(--pipe-water);
-            box-shadow: 0 0 12px var(--pipe-water);
+            box-shadow: 0 0 8px var(--pipe-water);
         }
         .filled .pipe-branch {
             background-color: var(--pipe-water);
-            box-shadow: 0 0 12px var(--pipe-water);
+            box-shadow: 0 0 8px var(--pipe-water);
         }
 
         /* 控制按钮 */
         .btn {
-            margin-top: 25px;
-            padding: 10px 24px;
-            background-color: #1e1e24;
-            color: white;
-            border: 1px solid #444;
-            border-radius: 5px;
+            margin-top: 15px;
+            width: 92vw;
+            max-width: 420px;
+            padding: 12px 0;
+            background-color: #111;
+            color: var(--pipe-water);
+            border: 1px solid #333;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 15px;
+            font-weight: bold;
             transition: all 0.2s;
         }
-        .btn:hover {
-            background-color: var(--pipe-water);
-            color: #000;
-            border-color: var(--pipe-water);
-            box-shadow: 0 0 15px rgba(0, 210, 255, 0.4);
+        .btn:active {
+            background-color: #222;
         }
 
         /* 通关弹窗 */
         .win-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.9);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -182,157 +214,141 @@
             z-index: 10;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.5s;
+            transition: opacity 0.3s;
         }
-        .win-overlay.show {
-            opacity: 1;
-            pointer-events: auto;
-        }
+        .win-overlay.show { opacity: 1; pointer-events: auto; }
         .win-box {
-            background: #222;
-            padding: 30px 60px;
-            border-radius: 10px;
-            border: 2px solid var(--pipe-water);
+            background: #0a0a0a;
+            padding: 25px 40px;
+            border-radius: 12px;
+            border: 1px solid var(--pipe-water);
             text-align: center;
-            box-shadow: 0 0 30px rgba(0, 210, 255, 0.5);
+            box-shadow: 0 0 25px rgba(0, 255, 102, 0.3);
+            width: 80%;
+            max-width: 320px;
         }
-        .win-box h2 {
-            color: var(--pipe-water);
-            font-size: 32px;
-            margin-bottom: 20px;
-        }
+        .win-box h2 { color: var(--pipe-water); font-size: 24px; margin-bottom: 12px; }
+        .medal { color: #ffd700; font-size: 15px; margin: 10px 0; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <h1>矩阵引水关卡</h1>
-    <div class="tips">点击格子顺时针旋转90°，将左上角通往右下角的管道完整接通。</div>
+
+    <div class="mode-selector">
+        <button id="mode-strict" class="mode-btn" onclick="switchMode(true)">严格模式 (无分叉)</button>
+        <button id="mode-score" class="mode-btn" onclick="switchMode(false)">得分模式 (多连通)</button>
+    </div>
+
+    <div class="status-bar">
+        <div>通水面积: <span id="water-count" class="status-val">0</span> / 100</div>
+        <div>实时得分: <span id="live-score" class="status-val">0</span></div>
+    </div>
 
     <div class="game-wrapper">
-        <div id="start-label" class="io-indicator">▶ 入水口</div>
-        <div id="end-label" class="io-indicator">出水口 ▶</div>
+        <div class="io-bar">
+            <span class="io-blink">▶ 入水口 (左侧进)</span>
+            <span class="io-blink">出水口 (右侧出) ▶</span>
+        </div>
         <div class="grid-container" id="grid"></div>
     </div>
 
-    <button class="btn" onclick="initGame()">重新生成关卡</button>
+    <button class="btn" onclick="initGame()">重新生成当前关卡</button>
 
     <div class="win-overlay" id="winOverlay">
         <div class="win-box">
-            <h2>恭喜通关！</h2>
-            <p>蓝色水流已顺利抵达终点。</p>
-            <button class="btn" onclick="closeWinOverlay()">下一关</button>
+            <h2>LEVEL CLEAR!</h2>
+            <div id="win-details" style="font-size: 14px; line-height: 1.6;"></div>
+            <div id="win-medal" class="medal"></div>
+            <button class="btn" style="width:100%;" onclick="closeWinOverlay()">进入下一关</button>
         </div>
     </div>
 
     <script>
+        // 从本地存储读取模式，若没有则默认设为 false (得分模式)
+        let STRICT_MODE = localStorage.getItem('pipe_strict_mode') === 'true';
+        
         const SIZE = 10;
         let gridData = [];
 
-        // 管道的标准类型定义 [上, 右, 下, 左]
         const TILE_TYPES = {
-            STRAIGHT_H: [false, true, false, true], // 水平直管
-            STRAIGHT_V: [true, false, true, false], // 垂直直管
-            ELBOW_BR:   [false, true, true, false], // 下、右弯头
-            ELBOW_BL:   [false, false, true, true], // 下、left弯头
-            ELBOW_TR:   [true, true, false, false], // 上、右弯头
-            ELBOW_TL:   [true, false, false, true], // 上、左弯头
-            TEE_NOT_T:  [false, true, true, true],  // 缺上三通
-            TEE_NOT_R:  [true, false, true, true],  // 缺右三通
-            TEE_NOT_B:  [true, true, false, true],  // 缺下三通
-            TEE_NOT_L:  [true, true, true, false],  // 缺左三通
-            CROSS:      [true, true, true, true]    // 十字全通
+            STRAIGHT_H: [false, true, false, true],
+            STRAIGHT_V: [true, false, true, false],
+            ELBOW_BR:   [false, true, true, false],
+            ELBOW_BL:   [false, false, true, true],
+            ELBOW_TR:   [true, true, false, false],
+            ELBOW_TL:   [true, false, false, true],
+            TEE_NOT_T:  [false, true, true, true],
+            TEE_NOT_R:  [true, false, true, true],
+            TEE_NOT_B:  [true, true, false, true],
+            TEE_NOT_L:  [true, true, true, false],
+            CROSS:      [true, true, true, true]
         };
 
-        // 初始化游戏
+        // 切换模式并记忆
+        function switchMode(isStrict) {
+            STRICT_MODE = isStrict;
+            localStorage.setItem('pipe_strict_mode', isStrict);
+            updateModeUI();
+            checkWaterFlow(); // 切换模式后即时刷新当前水流判定
+        }
+
+        function updateModeUI() {
+            document.getElementById('mode-strict').classList.toggle('active', STRICT_MODE);
+            document.getElementById('mode-score').classList.toggle('active', !STRICT_MODE);
+        }
+
         function initGame() {
+            updateModeUI();
             gridData = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
-            
-            // 1. 后台随机生成一条从 (0,0) 到 (9,9) 的确定路径
             const path = generateRandomPath();
-            
-            // 2. 根据路径走向给路径上的格子赋予对应的管道端口规格
             applyPathTiles(path);
-
-            // 3. 填充非路径格子（干扰项）
             fillDistractions();
-
-            // 4. 随机旋转所有格子 (0, 90, 180, 270 度)
             randomizeRotations();
-
-            // 5. 渲染到前端 DOM
             renderGrid();
-
-            // 6. 初始计算一次水流连通状态
             checkWaterFlow();
         }
 
-        // 随机路径生成 (DFS 寻路算法)
+        // DFS 后台唯一路径保证
         function generateRandomPath() {
             let visited = Array(SIZE).fill().map(() => Array(SIZE).fill(false));
             let path = [];
-
             function dfs(r, c) {
                 visited[r][c] = true;
                 path.push({r, c});
-
-                if (r === SIZE - 1 && c === SIZE - 1) {
-                    return true;
-                }
-
-                // 随机打乱四个方向
+                if (r === SIZE - 1 && c === SIZE - 1) return true;
                 let dirs = [[0, 1], [1, 0], [0, -1], [-1, 0]];
                 dirs.sort(() => Math.random() - 0.5);
-
                 for (let [dr, dc] of dirs) {
-                    let nr = r + dr;
-                    let nc = c + dc;
+                    let nr = r + dr; let nc = c + dc;
                     if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && !visited[nr][nc]) {
                         if (dfs(nr, nc)) return true;
                     }
                 }
-
                 path.pop();
                 return false;
             }
-
             dfs(0, 0);
             return path;
         }
 
-        // 根据路径赋予管路开口
         function applyPathTiles(path) {
-            // 设定外部入水口必须从左侧进，出水口从右侧出
             let requiredPorts = Array(SIZE).fill().map(() => Array(SIZE).fill().map(() => [false, false, false, false]));
-            
-            requiredPorts[0][0][3] = true; // 起点左侧开口
-            requiredPorts[SIZE-1][SIZE-1][1] = true; // 终点右侧开口
+            requiredPorts[0][0][3] = true; 
+            requiredPorts[SIZE-1][SIZE-1][1] = true; 
 
             for (let i = 0; i < path.length; i++) {
                 let curr = path[i];
-                
-                // 与前一个点接通
-                if (i > 0) {
-                    let prev = path[i-1];
-                    let dir = getDirection(curr, prev); // 当前点到前一点的方向
-                    requiredPorts[curr.r][curr.c][dir] = true;
-                }
-                // 与后一个点接通
-                if (i < path.length - 1) {
-                    let next = path[i+1];
-                    let dir = getDirection(curr, next); // 当前点到后一点的方向
-                    requiredPorts[curr.r][curr.c][dir] = true;
-                }
+                if (i > 0) requiredPorts[curr.r][curr.c][getDirection(curr, path[i-1])] = true;
+                if (i < path.length - 1) requiredPorts[curr.r][curr.c][getDirection(curr, path[i+1])] = true;
 
                 gridData[curr.r][curr.c] = {
                     basePorts: [...requiredPorts[curr.r][curr.c]],
-                    rotation: 0, 
-                    filled: false,
-                    isPath: true
+                    rotation: 0, filled: false, isPath: true
                 };
             }
         }
 
-        // 计算 A 到 B 的相对方向 (0:上, 1:右, 2:下, 3:左)
         function getDirection(from, to) {
             if (to.r < from.r) return 0;
             if (to.c > from.c) return 1;
@@ -341,69 +357,58 @@
             return 0;
         }
 
-        // 填充其余格子作为干扰项
         function fillDistractions() {
             const types = Object.values(TILE_TYPES);
             for (let r = 0; r < SIZE; r++) {
                 for (let c = 0; c < SIZE; c++) {
                     if (!gridData[r][c]) {
-                        // 随机抽取一种标准管件结构
                         let randomType = types[Math.floor(Math.random() * types.length)];
                         gridData[r][c] = {
                             basePorts: [...randomType],
-                            rotation: 0,
-                            filled: false,
-                            isPath: false
+                            rotation: 0, filled: false, isPath: false
                         };
                     }
                 }
             }
         }
 
-        // 随机赋予初始旋转角度
         function randomizeRotations() {
             for (let r = 0; r < SIZE; r++) {
                 for (let c = 0; c < SIZE; c++) {
-                    gridData[r][c].rotation = Math.floor(Math.random() * 4); // 0, 1, 2, 3 代表乘 90 度
+                    gridData[r][c].rotation = Math.floor(Math.random() * 4);
                 }
             }
         }
 
-        // 获取格子当前的实际端口开放状态（考虑旋转）
         function getCurrentPorts(cell) {
             let current = [false, false, false, false];
             for (let i = 0; i < 4; i++) {
-                // 顺时针旋转后，原先处于 (i - rotation) 位置的端口转到了当前 i 位置
                 let origIndex = (i - cell.rotation + 4) % 4;
                 current[i] = cell.basePorts[origIndex];
             }
             return current;
         }
 
-        // DOM 矩阵渲染
         function renderGrid() {
             const container = document.getElementById('grid');
             container.innerHTML = '';
-
             for (let r = 0; r < SIZE; r++) {
                 for (let c = 0; c < SIZE; c++) {
                     const cellData = gridData[r][c];
-                    
                     const cellDiv = document.createElement('div');
                     cellDiv.className = 'cell';
                     cellDiv.id = `cell-${r}-${c}`;
+                    // 移动端及PC端同一点击事件处理器
                     cellDiv.onclick = () => rotateCell(r, c);
 
                     const innerDiv = document.createElement('div');
                     innerDiv.className = 'pipe-inner';
                     innerDiv.style.transform = `rotate(${cellData.rotation * 90}deg)`;
 
-                    // 核心阀门方块样式
                     const core = document.createElement('div');
                     core.className = 'pipe-core';
                     innerDiv.appendChild(core);
 
-                    // 根据原始端口数据生成分支元素（因为整体旋转会由父级 CSS 处理）
                     for (let i = 0; i < 4; i++) {
                         if (cellData.basePorts[i]) {
                             const branch = document.createElement('div');
@@ -411,66 +416,51 @@
                             innerDiv.appendChild(branch);
                         }
                     }
-
                     cellDiv.appendChild(innerDiv);
                     container.appendChild(cellDiv);
                 }
             }
         }
 
-        // 点击格子顺时针旋转 90 度
         function rotateCell(r, c) {
             let cell = gridData[r][c];
             cell.rotation = (cell.rotation + 1) % 4;
-            
-            // 更新该格子的旋转动画
             const cellDiv = document.getElementById(`cell-${r}-${c}`);
             const innerDiv = cellDiv.querySelector('.pipe-inner');
             innerDiv.style.transform = `rotate(${cell.rotation * 90}deg)`;
-
-            // 重新演算全图水流连通
             checkWaterFlow();
         }
 
-        // 水流连通模拟及胜负判定 (BFS)
         function checkWaterFlow() {
-            // 重置所有格子的水流状态
             for (let r = 0; r < SIZE; r++) {
-                for (let c = 0; c < SIZE; c++) {
-                    gridData[r][c].filled = false;
-                }
+                for (let c = 0; c < SIZE; c++) gridData[r][c].filled = false;
             }
 
             let queue = [];
             let visited = Array(SIZE).fill().map(() => Array(SIZE).fill(false));
 
-            // 入水口检查：(0,0) 的左端口（Index 3）必须对外开放，方可引水
             let startCell = gridData[0][0];
             if (getCurrentPorts(startCell)[3]) {
                 queue.push({r: 0, c: 0});
                 visited[0][0] = true;
             }
 
-            const dr = [-1, 0, 1, 0]; // 上, 右, 下, 左
+            const dr = [-1, 0, 1, 0];
             const dc = [0, 1, 0, -1];
+            let filledCount = 0;
 
             while (queue.length > 0) {
                 let curr = queue.shift();
                 gridData[curr.r][curr.c].filled = true;
+                filledCount++;
 
                 let currPorts = getCurrentPorts(gridData[curr.r][curr.c]);
-
                 for (let i = 0; i < 4; i++) {
-                    if (currPorts[i]) { // 如果当前格子的这个方向是开通的
-                        let nr = curr.r + dr[i];
-                        let nc = curr.c + dc[i];
-
+                    if (currPorts[i]) {
+                        let nr = curr.r + dr[i]; let nc = curr.c + dc[i];
                         if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && !visited[nr][nc]) {
-                            let neighbor = gridData[nr][nc];
-                            let neighborPorts = getCurrentPorts(neighbor);
-                            let oppDir = (i + 2) % 4; // 邻居对应的接口方向
-
-                            if (neighborPorts[oppDir]) { // 相互无缝对接成功
+                            let neighborPorts = getCurrentPorts(gridData[nr][nc]);
+                            if (neighborPorts[(i + 2) % 4]) {
                                 visited[nr][nc] = true;
                                 queue.push({r: nr, c: nc});
                             }
@@ -479,24 +469,66 @@
                 }
             }
 
-            // 更新全图格子的流水色泽
             for (let r = 0; r < SIZE; r++) {
                 for (let c = 0; c < SIZE; c++) {
                     const cellDiv = document.getElementById(`cell-${r}-${c}`);
+                    if (gridData[r][c].filled) cellDiv.classList.add('filled');
+                    else cellDiv.classList.remove('filled');
+                }
+            }
+
+            let baseScore = filledCount * 10;
+            document.getElementById('water-count').innerText = filledCount;
+            document.getElementById('live-score').innerText = baseScore;
+
+            // 分支或回路检测
+            let hasBranchOrLoop = false;
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
                     if (gridData[r][c].filled) {
-                        cellDiv.classList.add('filled');
-                    } else {
-                        cellDiv.classList.remove('filled');
+                        let activeConnections = 0;
+                        let ports = getCurrentPorts(gridData[r][c]);
+                        for(let i=0; i<4; i++) {
+                            if(ports[i]) {
+                                let nr = r + dr[i]; let nc = c + dc[i];
+                                if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && gridData[nr][nc].filled) {
+                                    if(getCurrentPorts(gridData[nr][nc])[(i+2)%4]) activeConnections++;
+                                }
+                            }
+                        }
+                        if (activeConnections > 2) hasBranchOrLoop = true;
                     }
                 }
             }
 
-            // 胜利判定：终点(9,9)被灌满水，且终点的右端口（Index 1）也是通畅的
             let endCell = gridData[SIZE-1][SIZE-1];
-            if (endCell.filled && getCurrentPorts(endCell)[1]) {
+            let isEndConnected = endCell.filled && getCurrentPorts(endCell)[1];
+
+            if (isEndConnected) {
+                if (STRICT_MODE && hasBranchOrLoop) return; // 严格模式有分叉则不触发胜利
+
                 setTimeout(() => {
+                    const details = document.getElementById('win-details');
+                    const medal = document.getElementById('win-medal');
+                    
+                    if (STRICT_MODE) {
+                        details.innerHTML = `完美达成单向纯净引水！<br>总得分: <span style='color:var(--pipe-water)'>${baseScore}</span> 分`;
+                        medal.innerText = "🟩 获得勋章：【完美纯净流】";
+                    } else {
+                        let finalScore = baseScore;
+                        let medalText = "提示：尝试完美单线或扩充更大面积！";
+                        if (!hasBranchOrLoop) {
+                            finalScore += 200;
+                            medalText = "⚡ 奇迹！开放模式下达成纯净单线：【极简主义】+200分";
+                        } else if (filledCount > 25) {
+                            finalScore += 100;
+                            medalText = "🔋 壮观！激活了超大面积绿能：【矩阵蓄水池】+100分";
+                        }
+                        details.innerHTML = `本次通关共充满 <span style='color:var(--pipe-water)'>${filledCount}</span> 个网格。<br>总结算得分: <span style='color:#ffd700; font-size:18px;'>${finalScore}</span> 分`;
+                        medal.innerText = medalText;
+                    }
                     document.getElementById('winOverlay').classList.add('show');
-                }, 300); // 延时展现通关视觉
+                }, 300);
             }
         }
 
@@ -505,7 +537,6 @@
             initGame();
         }
 
-        // 页面加载完毕自动运行
         window.onload = initGame;
     </script>
 </body>
