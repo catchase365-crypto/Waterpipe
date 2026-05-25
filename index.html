@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>矩阵接水管核心关卡</title>
+    <style>
+        :root {
+            --bg-color: #121214;
+            --grid-bg: #1e1e24;
+            --cell-bg: #2a2a35;
+            --pipe-empty: #505061;
+            --pipe-water: #00d2ff;
+            --text-color: #ffffff;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        h1 {
+            margin-bottom: 5px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
+        }
+
+        .tips {
+            color: #aaa;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        /* 游戏主容器，包含入水口和出水口提示 */
+        .game-wrapper {
+            position: relative;
+            padding: 20px;
+        }
+
+        /* 起点和终点标签 */
+        .io-indicator {
+            position: absolute;
+            background: rgba(0, 210, 255, 0.1);
+            border: 1px solid var(--pipe-water);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: var(--pipe-water);
+            box-shadow: 0 0 8px rgba(0, 210, 255, 0.2);
+        }
+        #start-label { top: -40px; left: 0; }
+        #end-label { bottom: -40px; right: 0; }
+
+        /* 10x10 网格容器 */
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(10, 8vw);
+            grid-template-rows: repeat(10, 8vw);
+            gap: 2px;
+            background-color: var(--grid-bg);
+            padding: 5px;
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            max-width: 95vw;
+        }
+
+        /* 单个格子样式 */
+        .cell {
+            width: 8vw;
+            height: 8vw;
+            background-color: var(--cell-bg);
+            border-radius: 4px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: background-color 0.2s;
+        }
+
+        /* 单个格子样式 */
+        .cell {
+            background-color: var(--cell-bg);
+            border-radius: 4px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: background-color 0.2s;
+        }
+
+        .cell:hover {
+            background-color: #353545;
+        }
+
+        /* 内部旋转层 */
+        .pipe-inner {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transition: transform 0.25s ease-out;
+        }
+
+        /* 阀门/水管核心：正方形模块 */
+        .pipe-core {
+            position: absolute;
+            top: 32%;
+            left: 32%;
+            width: 36%;
+            height: 36%;
+            background-color: var(--pipe-empty);
+            border-radius: 3px;
+            z-index: 2;
+            transition: background-color 0.3s, box-shadow 0.3s;
+        }
+
+        /* 水管分支（上下左右） */
+        .pipe-branch {
+            position: absolute;
+            background-color: var(--pipe-empty);
+            z-index: 1;
+            transition: background-color 0.3s, box-shadow 0.3s;
+        }
+
+        .branch-0 { /* Top */
+            top: 0; left: 42%; width: 16%; height: 42%;
+        }
+        .branch-1 { /* Right */
+            top: 42%; right: 0; width: 42%; height: 16%;
+        }
+        .branch-2 { /* Bottom */
+            bottom: 0; left: 42%; width: 16%; height: 42%;
+        }
+        .branch-3 { /* Left */
+            top: 42%; left: 0; width: 42%; height: 16%;
+        }
+
+        /* 充水状态下的样式 */
+        .filled .pipe-core {
+            background-color: var(--pipe-water);
+            box-shadow: 0 0 12px var(--pipe-water);
+        }
+        .filled .pipe-branch {
+            background-color: var(--pipe-water);
+            box-shadow: 0 0 12px var(--pipe-water);
+        }
+
+        /* 控制按钮 */
+        .btn {
+            margin-top: 25px;
+            padding: 10px 24px;
+            background-color: #1e1e24;
+            color: white;
+            border: 1px solid #444;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            background-color: var(--pipe-water);
+            color: #000;
+            border-color: var(--pipe-water);
+            box-shadow: 0 0 15px rgba(0, 210, 255, 0.4);
+        }
+
+        /* 通关弹窗 */
+        .win-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
+        }
+        .win-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .win-box {
+            background: #222;
+            padding: 30px 60px;
+            border-radius: 10px;
+            border: 2px solid var(--pipe-water);
+            text-align: center;
+            box-shadow: 0 0 30px rgba(0, 210, 255, 0.5);
+        }
+        .win-box h2 {
+            color: var(--pipe-water);
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>矩阵引水关卡</h1>
+    <div class="tips">点击格子顺时针旋转90°，将左上角通往右下角的管道完整接通。</div>
+
+    <div class="game-wrapper">
+        <div id="start-label" class="io-indicator">▶ 入水口</div>
+        <div id="end-label" class="io-indicator">出水口 ▶</div>
+        <div class="grid-container" id="grid"></div>
+    </div>
+
+    <button class="btn" onclick="initGame()">重新生成关卡</button>
+
+    <div class="win-overlay" id="winOverlay">
+        <div class="win-box">
+            <h2>恭喜通关！</h2>
+            <p>蓝色水流已顺利抵达终点。</p>
+            <button class="btn" onclick="closeWinOverlay()">下一关</button>
+        </div>
+    </div>
+
+    <script>
+        const SIZE = 10;
+        let gridData = [];
+
+        // 管道的标准类型定义 [上, 右, 下, 左]
+        const TILE_TYPES = {
+            STRAIGHT_H: [false, true, false, true], // 水平直管
+            STRAIGHT_V: [true, false, true, false], // 垂直直管
+            ELBOW_BR:   [false, true, true, false], // 下、右弯头
+            ELBOW_BL:   [false, false, true, true], // 下、left弯头
+            ELBOW_TR:   [true, true, false, false], // 上、右弯头
+            ELBOW_TL:   [true, false, false, true], // 上、左弯头
+            TEE_NOT_T:  [false, true, true, true],  // 缺上三通
+            TEE_NOT_R:  [true, false, true, true],  // 缺右三通
+            TEE_NOT_B:  [true, true, false, true],  // 缺下三通
+            TEE_NOT_L:  [true, true, true, false],  // 缺左三通
+            CROSS:      [true, true, true, true]    // 十字全通
+        };
+
+        // 初始化游戏
+        function initGame() {
+            gridData = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
+            
+            // 1. 后台随机生成一条从 (0,0) 到 (9,9) 的确定路径
+            const path = generateRandomPath();
+            
+            // 2. 根据路径走向给路径上的格子赋予对应的管道端口规格
+            applyPathTiles(path);
+
+            // 3. 填充非路径格子（干扰项）
+            fillDistractions();
+
+            // 4. 随机旋转所有格子 (0, 90, 180, 270 度)
+            randomizeRotations();
+
+            // 5. 渲染到前端 DOM
+            renderGrid();
+
+            // 6. 初始计算一次水流连通状态
+            checkWaterFlow();
+        }
+
+        // 随机路径生成 (DFS 寻路算法)
+        function generateRandomPath() {
+            let visited = Array(SIZE).fill().map(() => Array(SIZE).fill(false));
+            let path = [];
+
+            function dfs(r, c) {
+                visited[r][c] = true;
+                path.push({r, c});
+
+                if (r === SIZE - 1 && c === SIZE - 1) {
+                    return true;
+                }
+
+                // 随机打乱四个方向
+                let dirs = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+                dirs.sort(() => Math.random() - 0.5);
+
+                for (let [dr, dc] of dirs) {
+                    let nr = r + dr;
+                    let nc = c + dc;
+                    if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && !visited[nr][nc]) {
+                        if (dfs(nr, nc)) return true;
+                    }
+                }
+
+                path.pop();
+                return false;
+            }
+
+            dfs(0, 0);
+            return path;
+        }
+
+        // 根据路径赋予管路开口
+        function applyPathTiles(path) {
+            // 设定外部入水口必须从左侧进，出水口从右侧出
+            let requiredPorts = Array(SIZE).fill().map(() => Array(SIZE).fill().map(() => [false, false, false, false]));
+            
+            requiredPorts[0][0][3] = true; // 起点左侧开口
+            requiredPorts[SIZE-1][SIZE-1][1] = true; // 终点右侧开口
+
+            for (let i = 0; i < path.length; i++) {
+                let curr = path[i];
+                
+                // 与前一个点接通
+                if (i > 0) {
+                    let prev = path[i-1];
+                    let dir = getDirection(curr, prev); // 当前点到前一点的方向
+                    requiredPorts[curr.r][curr.c][dir] = true;
+                }
+                // 与后一个点接通
+                if (i < path.length - 1) {
+                    let next = path[i+1];
+                    let dir = getDirection(curr, next); // 当前点到后一点的方向
+                    requiredPorts[curr.r][curr.c][dir] = true;
+                }
+
+                gridData[curr.r][curr.c] = {
+                    basePorts: [...requiredPorts[curr.r][curr.c]],
+                    rotation: 0, 
+                    filled: false,
+                    isPath: true
+                };
+            }
+        }
+
+        // 计算 A 到 B 的相对方向 (0:上, 1:右, 2:下, 3:左)
+        function getDirection(from, to) {
+            if (to.r < from.r) return 0;
+            if (to.c > from.c) return 1;
+            if (to.r > from.r) return 2;
+            if (to.c < from.c) return 3;
+            return 0;
+        }
+
+        // 填充其余格子作为干扰项
+        function fillDistractions() {
+            const types = Object.values(TILE_TYPES);
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    if (!gridData[r][c]) {
+                        // 随机抽取一种标准管件结构
+                        let randomType = types[Math.floor(Math.random() * types.length)];
+                        gridData[r][c] = {
+                            basePorts: [...randomType],
+                            rotation: 0,
+                            filled: false,
+                            isPath: false
+                        };
+                    }
+                }
+            }
+        }
+
+        // 随机赋予初始旋转角度
+        function randomizeRotations() {
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    gridData[r][c].rotation = Math.floor(Math.random() * 4); // 0, 1, 2, 3 代表乘 90 度
+                }
+            }
+        }
+
+        // 获取格子当前的实际端口开放状态（考虑旋转）
+        function getCurrentPorts(cell) {
+            let current = [false, false, false, false];
+            for (let i = 0; i < 4; i++) {
+                // 顺时针旋转后，原先处于 (i - rotation) 位置的端口转到了当前 i 位置
+                let origIndex = (i - cell.rotation + 4) % 4;
+                current[i] = cell.basePorts[origIndex];
+            }
+            return current;
+        }
+
+        // DOM 矩阵渲染
+        function renderGrid() {
+            const container = document.getElementById('grid');
+            container.innerHTML = '';
+
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    const cellData = gridData[r][c];
+                    
+                    const cellDiv = document.createElement('div');
+                    cellDiv.className = 'cell';
+                    cellDiv.id = `cell-${r}-${c}`;
+                    cellDiv.onclick = () => rotateCell(r, c);
+
+                    const innerDiv = document.createElement('div');
+                    innerDiv.className = 'pipe-inner';
+                    innerDiv.style.transform = `rotate(${cellData.rotation * 90}deg)`;
+
+                    // 核心阀门方块样式
+                    const core = document.createElement('div');
+                    core.className = 'pipe-core';
+                    innerDiv.appendChild(core);
+
+                    // 根据原始端口数据生成分支元素（因为整体旋转会由父级 CSS 处理）
+                    for (let i = 0; i < 4; i++) {
+                        if (cellData.basePorts[i]) {
+                            const branch = document.createElement('div');
+                            branch.className = `pipe-branch branch-${i}`;
+                            innerDiv.appendChild(branch);
+                        }
+                    }
+
+                    cellDiv.appendChild(innerDiv);
+                    container.appendChild(cellDiv);
+                }
+            }
+        }
+
+        // 点击格子顺时针旋转 90 度
+        function rotateCell(r, c) {
+            let cell = gridData[r][c];
+            cell.rotation = (cell.rotation + 1) % 4;
+            
+            // 更新该格子的旋转动画
+            const cellDiv = document.getElementById(`cell-${r}-${c}`);
+            const innerDiv = cellDiv.querySelector('.pipe-inner');
+            innerDiv.style.transform = `rotate(${cell.rotation * 90}deg)`;
+
+            // 重新演算全图水流连通
+            checkWaterFlow();
+        }
+
+        // 水流连通模拟及胜负判定 (BFS)
+        function checkWaterFlow() {
+            // 重置所有格子的水流状态
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    gridData[r][c].filled = false;
+                }
+            }
+
+            let queue = [];
+            let visited = Array(SIZE).fill().map(() => Array(SIZE).fill(false));
+
+            // 入水口检查：(0,0) 的左端口（Index 3）必须对外开放，方可引水
+            let startCell = gridData[0][0];
+            if (getCurrentPorts(startCell)[3]) {
+                queue.push({r: 0, c: 0});
+                visited[0][0] = true;
+            }
+
+            const dr = [-1, 0, 1, 0]; // 上, 右, 下, 左
+            const dc = [0, 1, 0, -1];
+
+            while (queue.length > 0) {
+                let curr = queue.shift();
+                gridData[curr.r][curr.c].filled = true;
+
+                let currPorts = getCurrentPorts(gridData[curr.r][curr.c]);
+
+                for (let i = 0; i < 4; i++) {
+                    if (currPorts[i]) { // 如果当前格子的这个方向是开通的
+                        let nr = curr.r + dr[i];
+                        let nc = curr.c + dc[i];
+
+                        if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && !visited[nr][nc]) {
+                            let neighbor = gridData[nr][nc];
+                            let neighborPorts = getCurrentPorts(neighbor);
+                            let oppDir = (i + 2) % 4; // 邻居对应的接口方向
+
+                            if (neighborPorts[oppDir]) { // 相互无缝对接成功
+                                visited[nr][nc] = true;
+                                queue.push({r: nr, c: nc});
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 更新全图格子的流水色泽
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    const cellDiv = document.getElementById(`cell-${r}-${c}`);
+                    if (gridData[r][c].filled) {
+                        cellDiv.classList.add('filled');
+                    } else {
+                        cellDiv.classList.remove('filled');
+                    }
+                }
+            }
+
+            // 胜利判定：终点(9,9)被灌满水，且终点的右端口（Index 1）也是通畅的
+            let endCell = gridData[SIZE-1][SIZE-1];
+            if (endCell.filled && getCurrentPorts(endCell)[1]) {
+                setTimeout(() => {
+                    document.getElementById('winOverlay').classList.add('show');
+                }, 300); // 延时展现通关视觉
+            }
+        }
+
+        function closeWinOverlay() {
+            document.getElementById('winOverlay').classList.remove('show');
+            initGame();
+        }
+
+        // 页面加载完毕自动运行
+        window.onload = initGame;
+    </script>
+</body>
+</html>
