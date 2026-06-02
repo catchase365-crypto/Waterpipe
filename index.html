@@ -230,6 +230,12 @@
         .win-box h2 { color: var(--pipe-water); font-size: 24px; margin-bottom: 12px; }
         .medal { color: #ffd700; font-size: 15px; margin: 10px 0; font-weight: bold; }
     </style>
+
+<link rel="manifest" href="manifest.json">
+<script>
+if("service-worker" in navigator) navigator.serviceWorker.register("sw.js");
+window.addEventListener("click", function(){ var d=document.documentElement; (d.requestFullscreen||d.webkitRequestFullScreen).call(d); }, {once:true});
+</script>
 </head>
 <body>
 
